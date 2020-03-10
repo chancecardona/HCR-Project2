@@ -6,8 +6,9 @@
 
 import rospy, math, time
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import Pose2D
-import matplotlib.pyplot as plt 
+from geometry_msgs.msg import Pose2D 
+import numpy as np
+import matplotlib.pyplot as plt
 
 #Global position values
 x, y, theta = 0, 0, 0
@@ -16,16 +17,28 @@ x, y, theta = 0, 0, 0
 dmin = 0.5
 
 #Q Learning Variables:
-states1 = {front, left, right} 
-states2 = {close, medium, far}
-actions = {forward, left, right} #Define set of Actions
+sMap = {'front-close':0, 'front-medium':1, 'front-far':2,
+            'left-close':3, 'left-medium':4, 'left-far':5,
+            'right-close':6, 'right-medium':7, 'right-far':8}
+aMap = {'turnLeft':0, 'turnRight':1, 'goForward':2, 'turn180':3}
+states = [0,1,2,3,4,5,6,7,8,9] #Define set of States
+actions = [0,1,2, 3] #Define set of Actions
+Q = np.array(np.zeros((len(states), len(actions)))) 
+Q[sMap['front-close']][aMap['turnLeft']] = 1
+Q[sMap['right-close']][aMap['goForward']] = 1
+Q[sMap['left-close']][aMap['goForward']] = 1
 
+#def 
+
+#def chooseAction(Q, states, ranges): 
+    
 
 
 #Subscriber callback func. Updates position of Triton robot.
 def laserCallback(msg):
     global ranges_
-    ranges_ = msg.ranges
+    ranges_ = msg.ranges#{
+            #'right': min(msg.ranges[])
     #print('Ranges:', ranges_, 'Min Angle:', msg.angle_min, 'Max Angle', msg.angle_max)
     
 
@@ -68,16 +81,17 @@ if __name__ == '__main__':
         time.sleep(2)
 
         #Initialize Q Table
-        Q = {
-        (left, close) : right(), (left, medium) : forward, (left, far) : forward, 
-        (right, close) : left, (right, medium) : forward, (right, far) : forward, 
-        (front, close) : left, (front, medium) : forward, (front, far) : forward
-        }
         
 
         for i in range(5):
             move(2.0, 0.3)
             time.sleep(4)
+        
+        modelState = '{model_state: { model_name: triton_lidar, pose: { position: { x: 2.86134281893, y: 0.125907141799, z: 4.37897966708e-05 }, orientation: { x: -0.000146901110306, y: -0.000169459146978, z: 0.000185462525381, w: 0.999999957654 }}, twist: {  linear: { x: 10.4999990463, y: 0.0038952359464, z: 0.0 }, angular: { x: 0.0, y: 0.0, z: 0.0 } }, reference_frame: world }}'
+        rospy.ServiceProxy('/gazebo/set_model_state', modelState) 
+
+        plt.polar(np.linspace(0, 2*np.pi, len(ranges_)), ranges_)
+        plt.show()
 
         #Draw M logo
         #move2goal(2.5, 4)

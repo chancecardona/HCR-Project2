@@ -16,7 +16,7 @@ from pynput import keyboard
 
 #establish ros node and publisher to velocity
 rospy.init_node("teleop_robot")
-vel_pub = rospy.Publisher("/triton/vel_cmd", Pose2D, queue_size=2)
+vel_pub = rospy.Publisher("/triton_lidar/vel_cmd", Pose2D, queue_size=2)
 
 LIN_SPEED = 0.2
 ANG_SPEED = 1.0
