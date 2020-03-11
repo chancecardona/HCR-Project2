@@ -10,8 +10,6 @@ from geometry_msgs.msg import Pose2D
 from gazebo_msgs.msg import ModelState
 from gazebo_msgs.srv import SetModelState, GetModelState
 import numpy as np
-import matplotlib.pyplot as plt
-import inspect
 
 #Global position values
 x, y, theta = 0, 0, 0
@@ -19,6 +17,7 @@ ranges_ = None
 
 #Physical parameters
 dmin = 0.5
+dmax = 1.2
 
 #Q Learning Variables:
 sMap = {'front-close':0, 'front-medium':1, 'front-far':2,
@@ -37,13 +36,11 @@ Q[sMap['left-close']][aMap['goForward']] = 1
 #def chooseAction(Q, states, ranges): 
     
 
-
+#Gazebo Functions. Allow us to get current state and set state of triton.
 def getState():
     rospy.wait_for_service('/gazebo/set_model_state')
     get_state_response = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState) 
     get_state = get_state_response('triton_lidar', 'world')
-    #print(inspect.getmembers(get_state))
-    print(inspect.isroutine(get_state))
     return get_state.pose
 
 def setState(pose):
@@ -65,27 +62,31 @@ def laserCallback(msg):
     #would be int(Angle*m/dTheta)
     #m = len(msg.ranges)
     #dTheta = msg.angle_increment * 180/np.pi
-    ranges_ = msg.ranges#{
-            #'right': min(msg.ranges[0:30])
-    #print('Ranges:', ranges_, 'Angle:', msg.angle_increment, 'M', len(msg.ranges))
+    ranges_ = {
+            'right': max(min(min(msg.ranges[-90:-30]), dmax), dmin),
+            'front-right': min(msg.ranges[-60:-30]),
+            'front': max(min(min(msg.ranges[-30:]+msg.ranges[:30]), dmax), dmin),
+            'front-left': min(msg.ranges[30:60]),
+            'left': max(min(min(msg.ranges[30:90]), dmax), dmin),
+            }
+
+    #print('Right', ranges_['right'], 'Left', ranges_['left'], 'front', ranges_['front'])
     
 
 
-def move(dist, speed):
-    global x, y, theta
-    x0, y0, theta0 = x, y, theta
-
-    #define message. Using Pose2D to define how to move.
-    vel_msg = Pose2D()
-
+def moveForward(dist, speed):
+    #define message. Using Twist to control velocity.
+    #vel_msg = Pose2D()
+    vel_msg = Twist()
+    
     #define topic and then publisher.
-    loop_rate = rospy.Rate(10)
     cmd_vel_topic = '/triton_lidar/vel_cmd'
     vel_pub = rospy.Publisher(cmd_vel_topic, Pose2D, queue_size=2)
+    loop_rate = rospy.Rate(10)
 
-    while math.hypot(x-x0, y-y0) < dist:
-        x += speed*math.cos(theta)
-        y += speed*math.sin(theta)
+    while:
+        x = speed*math.sin(theta)
+        y += speed*math.cos(theta)
         vel_msg.x, vel_msg.y = x, y
         vel_pub.publish(vel_msg)
         #print("X", x, "Y", y)
@@ -112,38 +113,15 @@ if __name__ == '__main__':
         move(2.0, 0.3)
         time.sleep(2)
        
-        pose = getState()
-        pose.position.x = 3
-        setState(pose)
-
-        plt.polar(np.linspace(0, 2*np.pi, len(ranges_)), ranges_)
-        plt.show()
-        pose.position.x = 3.2
-        setState(pose)
-        plt.polar(np.linspace(0, 2*np.pi, len(ranges_)), ranges_)
-        plt.show()
-        pose.position.x = 3.4
-        setState(pose)
-        plt.polar(np.linspace(0, 2*np.pi, len(ranges_)), ranges_)
-        plt.show()
-        pose.position.x = 3.6
-        setState(pose)
-        plt.polar(np.linspace(0, 2*np.pi, len(ranges_)), ranges_)
-        plt.show()
-        pose.position.x = 3.9
-        setState(pose)
-        plt.polar(np.linspace(0, 2*np.pi, len(ranges_)), ranges_)
-        plt.show()
+#        pose = getState()
+#        pose.position.x = 3
+#        pose.orientation.z = -np.pi/4
+#        setState(pose)
+#        print('Right', ranges_['right'], 'Left', ranges_['left'], 'front', ranges_['front'])
 
         
 
         
-
-        
-
-        #Draw M logo
-        #move2goal(2.5, 4)
-
         #loop_rate = rospy.Rate(10)
         #rospy.spin()
 
