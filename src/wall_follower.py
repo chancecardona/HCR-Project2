@@ -6,12 +6,16 @@
 
 import rospy, math, time
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import Pose2D 
+from geometry_msgs.msg import Pose2D
+from gazebo_msgs.msg import ModelState
+from gazebo_msgs.srv import SetModelState, GetModelState
 import numpy as np
 import matplotlib.pyplot as plt
+import inspect
 
 #Global position values
 x, y, theta = 0, 0, 0
+ranges_ = None
 
 #Physical parameters
 dmin = 0.5
@@ -34,12 +38,36 @@ Q[sMap['left-close']][aMap['goForward']] = 1
     
 
 
+def getState():
+    rospy.wait_for_service('/gazebo/set_model_state')
+    get_state_response = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState) 
+    get_state = get_state_response('triton_lidar', 'world')
+    #print(inspect.getmembers(get_state))
+    print(inspect.isroutine(get_state))
+    return get_state.pose
+
+def setState(pose):
+    rospy.wait_for_service('/gazebo/set_model_state')
+    state_msg = ModelState()
+    state_msg.model_name = 'triton_lidar'
+    state_msg.pose = pose
+    set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState) 
+    resp = set_state(state_msg)
+
+        
+
+
+
 #Subscriber callback func. Updates position of Triton robot.
 def laserCallback(msg):
     global ranges_
+    #These are for if m != 360. then your index
+    #would be int(Angle*m/dTheta)
+    #m = len(msg.ranges)
+    #dTheta = msg.angle_increment * 180/np.pi
     ranges_ = msg.ranges#{
-            #'right': min(msg.ranges[])
-    #print('Ranges:', ranges_, 'Min Angle:', msg.angle_min, 'Max Angle', msg.angle_max)
+            #'right': min(msg.ranges[0:30])
+    #print('Ranges:', ranges_, 'Angle:', msg.angle_increment, 'M', len(msg.ranges))
     
 
 
@@ -67,31 +95,51 @@ def move(dist, speed):
     vel_pub.publish(vel_msg)
 
 
-
 if __name__ == '__main__':
     try:
-        global ranges_
         #Initialize node to the ROS Master
-        rospy.init_node('triton_lidar_pose')      
+        rospy.init_node('triton_lidar_robot')      
         
         #declare pose subscriber
         position_topic = '/scan'
         pose_subscriber = rospy.Subscriber(position_topic, LaserScan, laserCallback) 
 
-        time.sleep(2)
+        time.sleep(4)
 
         #Initialize Q Table
         
 
-        for i in range(5):
-            move(2.0, 0.3)
-            time.sleep(4)
-        
-        modelState = '{model_state: { model_name: triton_lidar, pose: { position: { x: 2.86134281893, y: 0.125907141799, z: 4.37897966708e-05 }, orientation: { x: -0.000146901110306, y: -0.000169459146978, z: 0.000185462525381, w: 0.999999957654 }}, twist: {  linear: { x: 10.4999990463, y: 0.0038952359464, z: 0.0 }, angular: { x: 0.0, y: 0.0, z: 0.0 } }, reference_frame: world }}'
-        rospy.ServiceProxy('/gazebo/set_model_state', modelState) 
+        move(2.0, 0.3)
+        time.sleep(2)
+       
+        pose = getState()
+        pose.position.x = 3
+        setState(pose)
 
         plt.polar(np.linspace(0, 2*np.pi, len(ranges_)), ranges_)
         plt.show()
+        pose.position.x = 3.2
+        setState(pose)
+        plt.polar(np.linspace(0, 2*np.pi, len(ranges_)), ranges_)
+        plt.show()
+        pose.position.x = 3.4
+        setState(pose)
+        plt.polar(np.linspace(0, 2*np.pi, len(ranges_)), ranges_)
+        plt.show()
+        pose.position.x = 3.6
+        setState(pose)
+        plt.polar(np.linspace(0, 2*np.pi, len(ranges_)), ranges_)
+        plt.show()
+        pose.position.x = 3.9
+        setState(pose)
+        plt.polar(np.linspace(0, 2*np.pi, len(ranges_)), ranges_)
+        plt.show()
+
+        
+
+        
+
+        
 
         #Draw M logo
         #move2goal(2.5, 4)
