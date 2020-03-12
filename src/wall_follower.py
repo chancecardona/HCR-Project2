@@ -9,7 +9,8 @@ from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Pose2D, Twist
 from gazebo_msgs.msg import ModelState
 from gazebo_msgs.srv import SetModelState, GetModelState
-import numpy as np
+#import numpy as np
+#import matplotlib.pyplot as plt
 
 #Global values
 ranges_ = None
@@ -29,8 +30,10 @@ def train(states):
             for k in range(a-1):
                 for l in [1,3]:
                     Q[(i,j,k,l)] = [0,1,0,0]
-                    if ((k == 0 or k == 1 or k == 2 or j == 3):
-                        Q[(i,j,k,l)][2] = 2 #if front is close-med we or right-front is close we always turn left.
+                    if (i <= 1):
+                        Q[(i,j,k,l)][2] = 2
+                    elif (i == 3):
+                        Q[(i,j,k,l)][3] = 2
     
 
 
@@ -117,18 +120,19 @@ def setModelState(pose):
 
 
 #Subscriber callback func. Updates position of Triton robot.
-def laserCallback(msg):
-    global ranges_
+def laserCallback(msg):    
+    global ranges_, fullRange
+    fullRange = msg.ranges
     #These are for if m != 360. then your index
     #would be int(Angle*m/dTheta)
     #m = len(msg.ranges)
     #dTheta = msg.angle_increment * 180/np.pi
     ranges_ = {
-            'right': min(msg.ranges[-90:-30]),
-            'front-right': min(msg.ranges[-60:-30]),
-            'front': min(msg.ranges[-30:]+msg.ranges[:30]),
-            'front-left': min(msg.ranges[30:60]),
-            'left': min(msg.ranges[30:90]),
+            'right': min(msg.ranges[-30:]+msg.ranges[:30]),
+            'front-right': min(msg.ranges[30:60]),
+            'front': min(msg.ranges[30:90]),
+            'front-left': min(msg.ranges[120:150]),
+            'left': min(msg.ranges[150:-150]),
             }
 
     #print('Right', ranges_['right'], 'Left', ranges_['left'], 'front', ranges_['front'])
@@ -147,12 +151,14 @@ def moveForward(speed = 0.3):
 
 def turnLeft(speed = 0.3):
     vel_msg = Pose2D()
+    vel_msg.y = speed
     vel_msg.theta = speed
     rospy.loginfo("Turning Left")
     vel_pub.publish(vel_msg)
 
 def turnRight(speed = 0.3):
     vel_msg = Pose2D()
+    vel_msg.y = speed
     vel_msg.theta = -speed
     rospy.loginfo("Turning Right")
     vel_pub.publish(vel_msg)
@@ -181,6 +187,8 @@ if __name__ == '__main__':
         vel_pub = rospy.Publisher(cmd_vel_topic, Pose2D, queue_size=2)
         
         #Set up loop / Let things cool off
+        while ranges_ == None:
+            continue
         loop_rate = rospy.Rate(10)
         time.sleep(5)
 
@@ -188,13 +196,22 @@ if __name__ == '__main__':
         actions = aMap #Define set of Actions
         s = sMap
         train(s)
+
+        pose = getModelState()
+        pose.position.y = 3.1
+        pose.position.x = 3.5
+        pose.orientation.z = math.pi/4 - 0.2
+        setModelState(pose)
         prevTime = time.time()
+    
 
         while True:
             state = getState()
             print(state)
             policy(actions, state)
-            time.sleep(0.1)
+            loop_rate.sleep()
+            #plt.polar(np.linspace(0, 2*np.pi, 360), fullRange)
+            #plt.show()
             #print(time.time() - prevTime)
         
         #rospy.spin()
