@@ -6,44 +6,105 @@
 
 import rospy, math, time
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import Pose2D
+from geometry_msgs.msg import Pose2D, Twist
 from gazebo_msgs.msg import ModelState
 from gazebo_msgs.srv import SetModelState, GetModelState
 import numpy as np
 
-#Global position values
-x, y, theta = 0, 0, 0
+#Global values
 ranges_ = None
-
-#Physical parameters
-dmin = 0.5
-dmax = 1.2
+Q = {} #Q has key states (R, FR, F, L), value action rewards (as long as actions is).
 
 #Q Learning Variables:
-sMap = {'front-close':0, 'front-medium':1, 'front-far':2,
-            'left-close':3, 'left-medium':4, 'left-far':5,
-            'right-close':6, 'right-medium':7, 'right-far':8}
-aMap = {'turnLeft':0, 'turnRight':1, 'goForward':2, 'turn180':3}
-states = [0,1,2,3,4,5,6,7,8,9] #Define set of States
-actions = [0,1,2, 3] #Define set of Actions
-Q = np.array(np.zeros((len(states), len(actions)))) 
-Q[sMap['front-close']][aMap['turnLeft']] = 1
-Q[sMap['right-close']][aMap['goForward']] = 1
-Q[sMap['left-close']][aMap['goForward']] = 1
+sMap = {'tooClose':0, 'close':1, 'medium':2, 'far':3, 'tooFar':4}
+aMap = {'stop':0, 'moveForward':1, 'turnLeft':2, 'turnRight':3}
 
-#def 
 
-#def chooseAction(Q, states, ranges): 
+def train(states):
+    global Q
+    a = len(states)
+    #Just go straight always
+    for i in range(a):
+        for j in [1,3]:
+            for k in range(a-1):
+                for l in [1,3]:
+                    Q[(i,j,k,l)] = [0,1,0,0]
+                    if ((k == 0 or k == 1 or k == 2 or j == 3):
+                        Q[(i,j,k,l)][2] = 2 #if front is close-med we or right-front is close we always turn left.
     
 
+
+
+#def reward(Q, state):
+#    #Avoid states where any of the sensors is too close or too far
+#    for s in state:
+#        if s == 0 or s == 4
+#            Q[state] = -1
+#
+#    Q[] = 1
+#    Q[] = 1 
+
+
+def policy(actions, state):
+    possibleActions = Q[state]
+    maxInd = possibleActions.index(max(possibleActions))
+    #call function chosen
+    if maxInd == 0:
+        stop()
+    elif maxInd == 1:
+        moveForward()
+    elif maxInd == 2:
+        turnLeft()
+    elif maxInd == 3:
+        turnRight()
+
+
+
+def getState(): 
+    #Defining Right
+    if ranges_['right'] < 0.5:
+        R = 0 #too close
+    elif ranges_['right'] >= 0.5 and ranges_['right'] < 0.6:
+        R = 1 #close
+    elif ranges_['right'] >= 0.6 and ranges_['right'] <= 0.8:
+        R = 2 #medium
+    elif ranges_['right'] > 0.8 and ranges_['right'] <= 1.2:
+        R = 3 #far
+    elif ranges_['right'] > 1.2:
+        R = 4 #too far
+    #Defining Front-Right
+    if ranges_['front-right'] <= 1.2:
+        FR = 1
+    elif ranges_['front-right'] > 1.2:
+        FR = 3
+    #Defining Front
+    if ranges_['front'] < 0.5:
+        F = 0 #too close
+    elif ranges_['front'] >= 0.5 and ranges_['front'] < 0.6:
+        F = 1 #close
+    elif ranges_['front'] >= 0.6 and ranges_['front'] <= 1.2:
+        F = 2 #medium
+    elif ranges_['front'] > 1.2:
+        F = 3 #far
+    #Defining Left
+    if ranges_['left'] <= 1.2:
+        L = 1
+    elif ranges_['left'] > 1.2:
+        L = 3
+
+    return (R, FR, F, L)
+    
+
+
+
 #Gazebo Functions. Allow us to get current state and set state of triton.
-def getState():
-    rospy.wait_for_service('/gazebo/set_model_state')
+def getModelState():
+    rospy.wait_for_service('/gazebo/get_model_state')
     get_state_response = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState) 
     get_state = get_state_response('triton_lidar', 'world')
     return get_state.pose
 
-def setState(pose):
+def setModelState(pose):
     rospy.wait_for_service('/gazebo/set_model_state')
     state_msg = ModelState()
     state_msg.model_name = 'triton_lidar'
@@ -63,36 +124,46 @@ def laserCallback(msg):
     #m = len(msg.ranges)
     #dTheta = msg.angle_increment * 180/np.pi
     ranges_ = {
-            'right': max(min(min(msg.ranges[-90:-30]), dmax), dmin),
+            'right': min(msg.ranges[-90:-30]),
             'front-right': min(msg.ranges[-60:-30]),
-            'front': max(min(min(msg.ranges[-30:]+msg.ranges[:30]), dmax), dmin),
+            'front': min(msg.ranges[-30:]+msg.ranges[:30]),
             'front-left': min(msg.ranges[30:60]),
-            'left': max(min(min(msg.ranges[30:90]), dmax), dmin),
+            'left': min(msg.ranges[30:90]),
             }
 
     #print('Right', ranges_['right'], 'Left', ranges_['left'], 'front', ranges_['front'])
     
 
 
-def moveForward(dist, speed):
-    #define message. Using Twist to control velocity.
-    #vel_msg = Pose2D()
-    vel_msg = Twist()
-    
-    #define topic and then publisher.
-    cmd_vel_topic = '/triton_lidar/vel_cmd'
-    vel_pub = rospy.Publisher(cmd_vel_topic, Pose2D, queue_size=2)
-    loop_rate = rospy.Rate(10)
+#makes robot move forward.
+def moveForward(speed = 0.3):
+    #define message. Using Pose to control velocity.
+    vel_msg = Pose2D()
+    vel_msg.x = 0
+    vel_msg.y = speed
+    vel_msg.theta = 0
+    rospy.loginfo("Forwards")
+    vel_pub.publish(vel_msg)
 
-    while:
-        x = speed*math.sin(theta)
-        y += speed*math.cos(theta)
-        vel_msg.x, vel_msg.y = x, y
-        vel_pub.publish(vel_msg)
-        #print("X", x, "Y", y)
-                
-    #stop the robot when distance is reached.
-    rospy.loginfo("reached")
+def turnLeft(speed = 0.3):
+    vel_msg = Pose2D()
+    vel_msg.theta = speed
+    rospy.loginfo("Turning Left")
+    vel_pub.publish(vel_msg)
+
+def turnRight(speed = 0.3):
+    vel_msg = Pose2D()
+    vel_msg.theta = -speed
+    rospy.loginfo("Turning Right")
+    vel_pub.publish(vel_msg)
+            
+#stop the robot
+def stop():
+    vel_msg = Pose2D()
+    vel_msg.x = 0
+    vel_msg.y = 0
+    vel_msg.theta = 0
+    rospy.loginfo("Stopping")
     vel_pub.publish(vel_msg)
 
 
@@ -101,32 +172,35 @@ if __name__ == '__main__':
         #Initialize node to the ROS Master
         rospy.init_node('triton_lidar_robot')      
         
-        #declare pose subscriber
+        #declare lidar subscriber
         position_topic = '/scan'
         pose_subscriber = rospy.Subscriber(position_topic, LaserScan, laserCallback) 
-
-        time.sleep(4)
-
-        #Initialize Q Table
         
-
-        move(2.0, 0.3)
-        time.sleep(2)
-       
-#        pose = getState()
-#        pose.position.x = 3
-#        pose.orientation.z = -np.pi/4
-#        setState(pose)
-#        print('Right', ranges_['right'], 'Left', ranges_['left'], 'front', ranges_['front'])
-
+        #declare movement publisher.
+        cmd_vel_topic = '/triton_lidar/vel_cmd'
+        vel_pub = rospy.Publisher(cmd_vel_topic, Pose2D, queue_size=2)
         
+        #Set up loop / Let things cool off
+        loop_rate = rospy.Rate(10)
+        time.sleep(5)
 
+        #Train the model (set our predefined Q values)
+        actions = aMap #Define set of Actions
+        s = sMap
+        train(s)
+        prevTime = time.time()
+
+        while True:
+            state = getState()
+            print(state)
+            policy(actions, state)
+            time.sleep(0.1)
+            #print(time.time() - prevTime)
         
-        #loop_rate = rospy.Rate(10)
         #rospy.spin()
 
 
     except rospy.ROSInterruptException:
-        rospy.loginfo("node terminated.")
+        rospy.loginfo("Node terminated.")
         pass
 
