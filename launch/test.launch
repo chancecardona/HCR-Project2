@@ -14,5 +14,6 @@
   
 
     <node pkg="wall_follower" name="wall_follower" type="wall_follower.py"/>
+       <param name="train" type="bool" value="false"/>
 
 </launch>

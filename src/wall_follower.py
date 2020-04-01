@@ -4,7 +4,7 @@
 # Follows a wall using Q-Learning,
 # Utilized for CSCI-473 for Project 2
 
-import rospy, math, time, random
+import rospy, tf, math, time, random
 import numpy as np
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Pose, Pose2D, Twist
@@ -24,7 +24,7 @@ class Agent(object):
             for j in [1,3]:
                 for k in range(a-1):
                     for l in [1,3]:
-                        self.Q[(i,j,k,l)] = np.array([0, 0, 0]) #np.array([0.5, 0, 0])   #Move forwards normally
+                        self.Q[(i,j,k,l)] = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]) #np.array([0.5, 0, 0])   #Move forwards normally
                         #if (i <= 1):            #Unless R is tooClose then turn left
                         #    self.Q[(i,j,k,l)][1] = 1 
                         #elif (i == 3):          #Or if R is Far then turn right.
@@ -43,13 +43,13 @@ class Agent(object):
             stuck = 0
             prevState = self.getState(robot)
             prevModelState = gazebo.getModelState()
-            for i in range(10000):
+            for i in range(4000):
                 self.policy(robot, prevState, n) #Take action with best Q value after observing the initial state
                 curState = self.getState(robot)
                 curModelState = gazebo.getModelState()
                 self.Q[prevState] = self.Q[prevState] + alpha*( self.reward(prevState) + gamma*max(self.Q[curState]) - self.Q[prevState] )
                 #Create exit conditions
-                if np.isclose(curModelState.position.x, prevModelState.position.x, atol=0.001) and np.isclose(curModelState.position.y, prevModelState.position.y, atol=0.001): #Tests if robot has been stuck for 30 steps
+                if np.isclose(curModelState.position.x, prevModelState.position.x, atol=0.002) and np.isclose(curModelState.position.y, prevModelState.position.y, atol=0.002): #Tests if robot has been stuck for 30 steps
                     stuck += 1
                     if stuck == 3:
                         rospy.loginfo("Robot stuck. Ending episode.")
@@ -63,20 +63,36 @@ class Agent(object):
                         break
                 else:
                     goodPolicy = 0
+                (r, p, y) = tf.transformations.euler_from_quaternion([curModelState.orientation.x, curModelState.orientation.y, curModelState.orientation.z, curModelState.orientation.w])
+                if abs(r) > math.pi/6 or abs(p) > math.pi/6:
+                    rospy.loginfo("Robot Tipped. Ending episode.")
+                    print(gazebo.state_msg.pose.orientation.x, curModelState.orientation.x)
+                    break
                 #Update states.
                 prevState = curState
                 prevModelState = curModelState
                 #print(prevModelState.position.x, prevModelState.position.y)
+                if i % 50 == 0:
+                    rospy.loginfo("Step: " + str(i))
                 robot.loop_rate.sleep()
+            self.saveQ()
         rospy.loginfo("Episodes completed. Q table learned. Saving file to '~/.ROS/ccardona_Q_table.npy'")
-        self.saveQ()
 
 
     def reward(self, state): 
         #Avoid states where right is too close, right is too far, front is too close, or left is close
         if state[0] == 0 or state[0] == 4 or state[2] == 0 or state[3] == 1:
+            #rospy.loginfo("BAD")
             return -1
-        return 0    
+        elif (state[0] == 1 or state[0] == 2 or state[0] == 3) and (state[2] == 1 or state[2] == 2 or state[2] == 3):
+            #rospy.loginfo("GOOD")
+            return 1
+        elif (state[0] == 1 or state[0] == 2 or state[0] == 3) or (state[2] == 1 or state[2] == 2 or state[2] == 3):
+            #rospy.loginfo("OK")
+            return 0.5
+        else:
+            #rospy.loginfo("____")
+            return 0    
     
 
     #Epsilon Greedy policy. n is episode number.
@@ -86,18 +102,33 @@ class Agent(object):
         #epsilon greedy with a decayed epsilon
         epsilon = epsilon0*(d**n)
         p = random.uniform(0,1)
-        if p >= 1 - epsilon:
+#        rospy.loginfo(str(1-epsilon) + ' , ' + str(p))
+        if p <= 1 - epsilon:
+            #rospy.loginfo("Max Move")
             maxInd = np.argmax(possibleActions)
         else:
+            #rospy.loginfo("Rand Move")
             maxInd = random.randrange(len(possibleActions))
         
         #call function chosen
         if maxInd == 0:
-            robot.moveForward()
+            robot.turnLeft(np.radians(40))
         elif maxInd == 1:
-            robot.turnLeft()
+            robot.turnLeft(np.radians(20))
         elif maxInd == 2:
-            robot.turnRight()
+            robot.turnLeft(np.radians(10))
+        elif maxInd == 3:
+            robot.turnLeft(np.radians(0.3))
+        elif maxInd == 4:
+            robot.moveForward()
+        elif maxInd == 5:
+            robot.turnRight(np.radians(0.3))
+        elif maxInd == 6:
+            robot.turnRight(np.radians(10))
+        elif maxInd == 7:
+            robot.turnRight(np.radians(20))
+        elif maxInd == 8:
+            robot.turnRight(np.radians(40))
     
 
     def getState(self, robot): 
@@ -217,15 +248,15 @@ class Triton(object):
         #rospy.loginfo("Forwards")
         self.vel_pub.publish(self.vel_msg)
     
-    def turnLeft(self, speed = 0.3):
+    def turnLeft(self, angSpeed, speed = 0.3):
         self.vel_msg.y = speed
-        self.vel_msg.theta = speed
+        self.vel_msg.theta = angSpeed
         #rospy.loginfo("Turning Left")
         self.vel_pub.publish(self.vel_msg)
     
-    def turnRight(self, speed = 0.3):
+    def turnRight(self, angSpeed, speed = 0.3):
         self.vel_msg.y = speed
-        self.vel_msg.theta = -speed
+        self.vel_msg.theta = -angSpeed
         #rospy.loginfo("Turning Right")
         self.vel_pub.publish(self.vel_msg)
                 
@@ -248,7 +279,10 @@ if __name__ == '__main__':
         
         #Initialize Model Pose.
         G = Gazebo()
-        
+      
+        #Continue from Last saved state. Comment if you wanna start over.
+        Q_Agent.loadQ()
+
         isTraining = rospy.get_param('/train')
 
         if isTraining:
