@@ -65,7 +65,7 @@ class Agent(object):
                 else:
                     goodPolicy = 0
                 (r, p, y) = tf.transformations.euler_from_quaternion([curModelState.orientation.x, curModelState.orientation.y, curModelState.orientation.z, curModelState.orientation.w])
-                if abs(r) > math.pi/6 or abs(p) > math.pi/6:
+                if abs(r) > math.pi/8 or abs(p) > math.pi/8:
                     rospy.loginfo("Robot Tipped. Ending episode.")
                     print(gazebo.state_msg.pose.orientation.x, curModelState.orientation.x)
                     break
@@ -84,12 +84,12 @@ class Agent(object):
         if state[0] == 0 or state[0] == 4 or state[2] == 0 or state[3] == 1:
             #rospy.loginfo("BAD")
             return -1
-        elif (state[0] == 1 or state[0] == 2 or state[0] == 3) and (state[2] == 1 or state[2] == 2 or state[2] == 3):
+        #elif (state[0] == 1 or state[0] == 2 or state[0] == 3) and (state[2] == 1 or state[2] == 2 or state[2] == 3):
             #rospy.loginfo("GOOD")
-            return 1
-        elif (state[0] == 1 or state[0] == 2 or state[0] == 3) or (state[2] == 1 or state[2] == 2 or state[2] == 3):
+        #    return 1
+        #elif (state[0] == 1 or state[0] == 2 or state[0] == 3) or (state[2] == 1 or state[2] == 2 or state[2] == 3):
             #rospy.loginfo("OK")
-            return 0.5
+        #    return 0.5
         else:
             #rospy.loginfo("____")
             return 0    
@@ -232,7 +232,7 @@ class Triton(object):
         #m = len(msg.self.ranges)
         #dTheta = msg.angle_increment * 180/np.pi
         self.ranges = {
-                'right': min(msg.ranges[:60],
+                'right': min(msg.ranges[:60]),
                 'front-right': min(msg.ranges[30:60]),
                 'front': min(msg.ranges[60:120]),
                 'left': min(msg.ranges[120:180]),
