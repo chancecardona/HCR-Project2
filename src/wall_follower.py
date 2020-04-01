@@ -38,6 +38,7 @@ class Agent(object):
             randx = random.randrange(1,9) - 4.5
             randy = random.randrange(1,9) - 4.5
             gazebo.setModelState(randx, randy) #puts robot randomly in any square. Always faces same direction.
+            #Initialize Variables
             rospy.loginfo("Episode" + str(n))
             goodPolicy = 0
             stuck = 0
@@ -71,7 +72,6 @@ class Agent(object):
                 #Update states.
                 prevState = curState
                 prevModelState = curModelState
-                #print(prevModelState.position.x, prevModelState.position.y)
                 if i % 50 == 0:
                     rospy.loginfo("Step: " + str(i))
                 robot.loop_rate.sleep()
@@ -232,11 +232,10 @@ class Triton(object):
         #m = len(msg.self.ranges)
         #dTheta = msg.angle_increment * 180/np.pi
         self.ranges = {
-                'right': min(msg.ranges[-30:]+msg.ranges[:30]),
+                'right': min(msg.ranges[:60],
                 'front-right': min(msg.ranges[30:60]),
-                'front': min(msg.ranges[30:90]),
-                'front-left': min(msg.ranges[120:150]),
-                'left': min(msg.ranges[150:-150]),
+                'front': min(msg.ranges[60:120]),
+                'left': min(msg.ranges[120:180]),
                 }
         #print('Right', self.ranges['right'], 'Left', ranges['left'], 'front', ranges['front'])
         
@@ -281,7 +280,7 @@ if __name__ == '__main__':
         G = Gazebo()
       
         #Continue from Last saved state. Comment if you wanna start over.
-        Q_Agent.loadQ()
+        #Q_Agent.loadQ()
 
         isTraining = rospy.get_param('/train')
 
