@@ -280,7 +280,7 @@ if __name__ == '__main__':
         G = Gazebo()
       
         #Continue from Last saved state. Comment if you wanna start over.
-        #Q_Agent.loadQ()
+        Q_Agent.loadQ()
 
         isTraining = rospy.get_param('/train')
 
