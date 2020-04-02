@@ -84,15 +84,15 @@ class Agent(object):
         if state[0] == 0 or state[0] == 4 or state[2] == 0 or state[3] == 1:
             #rospy.loginfo("BAD")
             return -1
-        #elif (state[0] == 1 or state[0] == 2 or state[0] == 3) and (state[2] == 1 or state[2] == 2 or state[2] == 3):
+        elif (state[0] == 2) and (state[2] != 0):
             #rospy.loginfo("GOOD")
-        #    return 1
-        #elif (state[0] == 1 or state[0] == 2 or state[0] == 3) or (state[2] == 1 or state[2] == 2 or state[2] == 3):
+            return 1
+        elif (state[0] == 1 or state[0] == 2 or state[0] == 3) and (state[2] != 0):
             #rospy.loginfo("OK")
-        #    return 0.5
+            return 0
         else:
-            #rospy.loginfo("____")
-            return 0    
+            rospy.loginfo("____")
+            return -0.2    
     
 
     #Epsilon Greedy policy. n is episode number.
@@ -280,7 +280,7 @@ if __name__ == '__main__':
         G = Gazebo()
       
         #Continue from Last saved state. Comment if you wanna start over.
-        Q_Agent.loadQ()
+        #Q_Agent.loadQ()
 
         isTraining = rospy.get_param('/train')
 
