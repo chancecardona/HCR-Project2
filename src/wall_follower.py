@@ -67,7 +67,6 @@ class Agent(object):
                 (r, p, y) = tf.transformations.euler_from_quaternion([curModelState.orientation.x, curModelState.orientation.y, curModelState.orientation.z, curModelState.orientation.w])
                 if abs(r) > math.pi/8 or abs(p) > math.pi/8:
                     rospy.loginfo("Robot Tipped. Ending episode.")
-                    print(gazebo.state_msg.pose.orientation.x, curModelState.orientation.x)
                     break
                 #Update states.
                 prevState = curState
@@ -81,17 +80,17 @@ class Agent(object):
 
     def reward(self, state): 
         #Avoid states where right is too close, right is too far, front is too close, or left is close
-        if state[0] == 0 or state[0] == 4 or state[2] == 0 or state[3] == 1:
+        if state[0] == 0 or state[2] == 0:
             #rospy.loginfo("BAD")
             return -1
-        elif (state[0] == 2) and (state[2] != 0):
+        elif state[0] == 2:
             #rospy.loginfo("GOOD")
             return 1
-        elif (state[0] == 1 or state[0] == 2 or state[0] == 3) and (state[2] != 0):
+        elif (state[0] == 1 or  state[0] == 3) and state[3] != 1:
             #rospy.loginfo("OK")
             return 0
         else:
-            rospy.loginfo("____")
+            #rospy.loginfo("MEH")
             return -0.2    
     
 
@@ -232,10 +231,10 @@ class Triton(object):
         #m = len(msg.self.ranges)
         #dTheta = msg.angle_increment * 180/np.pi
         self.ranges = {
-                'right': min(msg.ranges[:60]),
-                'front-right': min(msg.ranges[30:60]),
-                'front': min(msg.ranges[60:120]),
-                'left': min(msg.ranges[120:180]),
+                'right': np.mean(msg.ranges[:60]),
+                'front-right': np.mean(msg.ranges[30:60]),
+                'front': np.mean(msg.ranges[60:120]),
+                'left': np.mean(msg.ranges[120:180]),
                 }
         #print('Right', self.ranges['right'], 'Left', ranges['left'], 'front', ranges['front'])
         
