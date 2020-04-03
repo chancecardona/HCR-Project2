@@ -30,7 +30,7 @@ class Agent(object):
                         elif (i >= 3):          #Or if R is Far then turn right.
                             self.Q[(i,j,k,l)][6] = -0.1
                         elif (i == 1):          #Or if R is close then turn left.
-                            self.Q[(i,j,k,l)][6] = -0.1
+                            self.Q[(i,j,k,l)][3] = -0.1
 
     
     #episodes to train on, alpha is learning rate.
@@ -158,7 +158,7 @@ class Agent(object):
             L = 1
         elif robot.ranges['left'] > 0.5:
             L = 3
-    
+        
         return (R, FR, F, L)
 
     def saveQ(self):
@@ -213,8 +213,6 @@ class Triton(object):
         self.vel_pub = rospy.Publisher(self.cmd_vel_topic, Pose2D, queue_size=2)
         self.vel_msg = Pose2D()
 
-        #declare action space
-        self.actions = {'stop':0, 'moveForward':1, 'turnLeft':2, 'turnRight':3}
 
         self.loop_rate = rospy.Rate(10)
         #Wait for the Subscriber to get values before trying to read them to prevent errors.
@@ -286,8 +284,11 @@ if __name__ == '__main__':
             Q_Agent.train(triton, G, 150)
         elif not isTraining:
             #Load predefined Maze
-            rospy.loginfo("Starting in Test mode. Loading predefined Q table. Make sure this exists.")
-            Q_Agent.loadQ()
+            rospy.loginfo("Starting in Test mode. Loading pretrained Q table.")
+            try:
+                Q_Agent.loadQ()
+            except:
+                rospy.loginfo("No trained Q table. Starting from preinitialized Q table.")
 
         print("Maze completed. Trying sample solution.")
 
