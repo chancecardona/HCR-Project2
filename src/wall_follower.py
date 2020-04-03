@@ -23,12 +23,15 @@ class Agent(object):
         for i in range(a):
             for j in [1,3]:
                 for k in range(a-1):
-                    for l in [1,3]:
-                        self.Q[(i,j,k,l)] = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]) #np.array([0.5, 0, 0])   #Move forwards normally
-                        #if (i <= 1):            #Unless R is tooClose then turn left
-                        #    self.Q[(i,j,k,l)][1] = 1 
-                        #elif (i == 3):          #Or if R is Far then turn right.
-                        #    self.Q[(i,j,k,l)][2] = 1
+                    for l in [1,3]:                 #  F     L40   L20   L10   L0.3  R0.3  R10   R20   R40
+                        self.Q[(i,j,k,l)] = np.array([-0.4, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5])   #Move forwards normally
+                        if (k <= 1):            #Unless F is Close then turn hard left
+                            self.Q[(i,j,k,l)][1] = 0 
+                        elif (i >= 3):          #Or if R is Far then turn right.
+                            self.Q[(i,j,k,l)][6] = -0.1
+                        elif (i == 1):          #Or if R is close then turn left.
+                            self.Q[(i,j,k,l)][6] = -0.1
+
     
     #episodes to train on, alpha is learning rate.
     def train(self, robot, gazebo, episodes, alpha = 0.2, gamma = 0.8):
@@ -44,13 +47,13 @@ class Agent(object):
             stuck = 0
             prevState = self.getState(robot)
             prevModelState = gazebo.getModelState()
-            for i in range(4000):
+            for i in range(2000):
                 self.policy(robot, prevState, n) #Take action with best Q value after observing the initial state
                 curState = self.getState(robot)
                 curModelState = gazebo.getModelState()
                 self.Q[prevState] = self.Q[prevState] + alpha*( self.reward(prevState) + gamma*max(self.Q[curState]) - self.Q[prevState] )
                 #Create exit conditions
-                if np.isclose(curModelState.position.x, prevModelState.position.x, atol=0.002) and np.isclose(curModelState.position.y, prevModelState.position.y, atol=0.002): #Tests if robot has been stuck for 30 steps
+                if np.isclose(curModelState.position.x, prevModelState.position.x, atol=0.002) and np.isclose(curModelState.position.y, prevModelState.position.y, atol=0.002): #Tests if robot has been stuck for 3 steps
                     stuck += 1
                     if stuck == 3:
                         rospy.loginfo("Robot stuck. Ending episode.")
@@ -80,18 +83,12 @@ class Agent(object):
 
     def reward(self, state): 
         #Avoid states where right is too close, right is too far, front is too close, or left is close
-        if state[0] == 0 or state[2] == 0:
+        if state[0] == 0 or state[0] == 4 or state[2] == 0  or state[3] == 1:
             #rospy.loginfo("BAD")
             return -1
-        elif state[0] == 2:
-            #rospy.loginfo("GOOD")
-            return 1
-        elif (state[0] == 1 or  state[0] == 3) and state[3] != 1:
-            #rospy.loginfo("OK")
-            return 0
         else:
             #rospy.loginfo("MEH")
-            return -0.2    
+            return 0    
     
 
     #Epsilon Greedy policy. n is episode number.
@@ -102,7 +99,7 @@ class Agent(object):
         epsilon = epsilon0*(d**n)
         p = random.uniform(0,1)
 #        rospy.loginfo(str(1-epsilon) + ' , ' + str(p))
-        if p <= 1 - epsilon:
+        if p > epsilon:
             #rospy.loginfo("Max Move")
             maxInd = np.argmax(possibleActions)
         else:
@@ -110,16 +107,16 @@ class Agent(object):
             maxInd = random.randrange(len(possibleActions))
         
         #call function chosen
-        if maxInd == 0:
-            robot.turnLeft(np.radians(40))
-        elif maxInd == 1:
-            robot.turnLeft(np.radians(20))
-        elif maxInd == 2:
-            robot.turnLeft(np.radians(10))
-        elif maxInd == 3:
-            robot.turnLeft(np.radians(0.3))
-        elif maxInd == 4:
+        if maxInd == 0:                 #Forward is placed first because maxReward will always return first max listed.
             robot.moveForward()
+        elif maxInd == 1:
+            robot.turnLeft(np.radians(40))
+        elif maxInd == 2:
+            robot.turnLeft(np.radians(20))
+        elif maxInd == 3:
+            robot.turnLeft(np.radians(10))
+        elif maxInd == 4:
+            robot.turnLeft(np.radians(0.3))
         elif maxInd == 5:
             robot.turnRight(np.radians(0.3))
         elif maxInd == 6:
@@ -152,14 +149,14 @@ class Agent(object):
             F = 0 #too close
         elif robot.ranges['front'] >= 0.5 and robot.ranges['front'] < 0.6:
             F = 1 #close
-        elif robot.ranges['front'] >= 0.6 and robot.ranges['front'] <= 1.2:
+        elif robot.ranges['front'] >= 0.6 and robot.ranges['front'] < 1.2:
             F = 2 #medium
         elif robot.ranges['front'] > 1.2:
             F = 3 #far
         #Defining Left
-        if robot.ranges['left'] <= 1.2:
+        if robot.ranges['left'] <= 0.5:
             L = 1
-        elif robot.ranges['left'] > 1.2:
+        elif robot.ranges['left'] > 0.5:
             L = 3
     
         return (R, FR, F, L)
