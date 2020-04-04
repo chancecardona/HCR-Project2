@@ -25,17 +25,17 @@ class Agent(object):
                 for k in range(a-1):
                     for l in [1,3]:                 #  F     L40   L20   L10   L0.3  R0.3  R10   R20   R40
                         self.Q[(i,j,k,l)] = np.array([-0.4, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5])   #Move forwards normally
-                        if (k <= 1):            #Unless F is Close then turn hard left
-                            self.Q[(i,j,k,l)][1] = 0 
+                        #if (k <= 1 or i == 0):            #Unless F or R is Close then turn hard left
+                        #    self.Q[(i,j,k,l)][1] = 0 
                         elif (i >= 3):          #Or if R is Far then turn right.
                             self.Q[(i,j,k,l)][6] = -0.1
-                        elif (i == 1):          #Or if R is close then turn left.
-                            self.Q[(i,j,k,l)][3] = -0.1
+                        elif (i <= 1):          #Or if R is close then turn medium left.
+                            self.Q[(i,j,k,l)][2] = -0.1
 
     
     #episodes to train on, alpha is learning rate.
     def train(self, robot, gazebo, episodes, alpha = 0.2, gamma = 0.8):
-        for n in range(episodes):
+        for n in range(1, episodes):
             #Randomize Starting location
             robot.stop()
             randx = random.randrange(1,9) - 4.5
@@ -98,7 +98,7 @@ class Agent(object):
         #epsilon greedy with a decayed epsilon
         epsilon = epsilon0*(d**n)
         p = random.uniform(0,1)
-#        rospy.loginfo(str(1-epsilon) + ' , ' + str(p))
+        #rospy.loginfo(str(epsilon) + ' , ' + str(p))
         if p > epsilon:
             #rospy.loginfo("Max Move")
             maxInd = np.argmax(possibleActions)
@@ -108,22 +108,31 @@ class Agent(object):
         
         #call function chosen
         if maxInd == 0:                 #Forward is placed first because maxReward will always return first max listed.
+            #print("Forwards")
             robot.moveForward()
         elif maxInd == 1:
+            #print("Left40")
             robot.turnLeft(np.radians(40))
         elif maxInd == 2:
+            #print("Left20")
             robot.turnLeft(np.radians(20))
         elif maxInd == 3:
+            #print("Left10")
             robot.turnLeft(np.radians(10))
         elif maxInd == 4:
+            #print("Left0")
             robot.turnLeft(np.radians(0.3))
         elif maxInd == 5:
+            #print("Right0")
             robot.turnRight(np.radians(0.3))
         elif maxInd == 6:
+            #print("Right10")
             robot.turnRight(np.radians(10))
         elif maxInd == 7:
+            #print("Right20")
             robot.turnRight(np.radians(20))
         elif maxInd == 8:
+            #print("Right40")
             robot.turnRight(np.radians(40))
     
 
@@ -178,7 +187,11 @@ class Gazebo(object):
         self.setModelState() #Puts robot at corner of maze. can get rid of this.
 
     def getModelState(self):
-        rospy.wait_for_service('/gazebo/get_model_state')
+        try:
+            rospy.wait_for_service('/gazebo/get_model_state')
+        except rospy.ServiceException as e:
+            rospy.loginfo("GAZEBO NOT UPDATED")
+            pass
         get_state_response = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState) 
         get_state = get_state_response('triton_lidar', 'world')
         return get_state.pose
@@ -282,6 +295,7 @@ if __name__ == '__main__':
             #Train Maze
             rospy.loginfo("Starting in Train mode.")
             Q_Agent.train(triton, G, 150)
+            print("Maze completed. Trying sample solution.")
         elif not isTraining:
             #Load predefined Maze
             rospy.loginfo("Starting in Test mode. Loading pretrained Q table.")
@@ -290,13 +304,12 @@ if __name__ == '__main__':
             except:
                 rospy.loginfo("No trained Q table. Starting from preinitialized Q table.")
 
-        print("Maze completed. Trying sample solution.")
 
         #Solve Maze
         while True:
             state = Q_Agent.getState(triton)
-            print(state)
-            Q_Agent.policy(triton, state, 0, 1) #runs q table according to epsilon greedy.
+            #print(state)
+            Q_Agent.policy(triton, state, 0, 0) #runs q table according to epsilon greedy.
             triton.loop_rate.sleep()
         
 
