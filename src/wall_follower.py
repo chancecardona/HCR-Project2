@@ -27,9 +27,9 @@ class Agent(object):
                         self.Q[(i,j,k,l)] = np.array([-0.4, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5])   #Move forwards normally
                         #if (k <= 1 or i == 0):            #Unless F or R is Close then turn hard left
                         #    self.Q[(i,j,k,l)][1] = 0 
-                        elif (i >= 3):          #Or if R is Far then turn right.
+                        if (i >= 3):          #Or if R is Far then turn right.
                             self.Q[(i,j,k,l)][6] = -0.1
-                        elif (i <= 1):          #Or if R is close then turn medium left.
+                        if (i <= 1):          #Or if R is close then turn medium left.
                             self.Q[(i,j,k,l)][2] = -0.1
 
     
