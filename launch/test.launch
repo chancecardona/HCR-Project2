@@ -13,7 +13,7 @@
     </include>
   
 
-    <node pkg="wall_follower" name="wall_follower" type="wall_follower.py"/>
-       <param name="train" type="bool" value="false"/>
+    <node pkg="wall_follower" name="wall_follower" type="wall_follower.py" cwd="node"/>
+	<param name="train" type="bool" value="false"/>
 
 </launch>

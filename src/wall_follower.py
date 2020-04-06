@@ -24,20 +24,20 @@ class Agent(object):
             for fr in [1,3]:
                 for f in range(a-1):
                     for l in [1,3]:                 #  F     L40   L20   L10   L0.3  R40  R20   R10   R0.3
-                        self.Q[(r,fr,f,l)] = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0])   #Move forwards normally
+                        self.Q[(r,fr,f,l)] = np.array([0, 0, 0])#np.array([0, 0, 0, 0, 0, 0, 0, 0, 0])   #Move forwards normally
                         if (l == 1):            
-                            self.Q[(r,fr,f,l)][1:5] = -1 #left is close turn lefts-1
+                            self.Q[(r,fr,f,l)][1] = -1 #left is close turn lefts-1
                         if (f == 1):
                             self.Q[(r,fr,f,l)][0] = -1 #front is close forward-1
                         if (f == 0):
                             self.Q[(r,fr,f,l)][0] = -2 #front is too close forward-2
                         if (r == 4):
-                            self.Q[(r,fr,f,l)][4:] = -1 #right is too far rights-1
+                            self.Q[(r,fr,f,l)][2] = -1 #right is too far rights-1
                         if (r == 0):
-                            self.Q[(r,fr,f,l)][4:] = -2 #right is too close rights-2, lefts+=1
-                            self.Q[(r,fr,f,l)][1:5] += 1
+                            self.Q[(r,fr,f,l)][2] = -2 #right is too close rights-2, lefts+=1
+                            self.Q[(r,fr,f,l)][1] += 1
                         if (fr == 1): 
-                            self.Q[(r,fr,f,l)][4:] -= 1 #fr is close rights-=1
+                            self.Q[(r,fr,f,l)][2] -= 1 #fr is close rights-=1
    
 
     #episodes to train on, alpha is learning rate.
@@ -47,7 +47,7 @@ class Agent(object):
             robot.stop()
             randx = random.randrange(3,9) - 4.5
             randy = random.randrange(1,9) - 4.5
-            gazebo.setModelState(randx, randy) #puts robot randomly in any square except top 2 rows. Always faces same direction.
+            gazebo.setModelState() #puts robot randomly in any square except top 2 rows. Always faces same direction.
             #Initialize Variables
             rospy.loginfo("Episode" + str(n))
             goodPolicy = 0
@@ -58,7 +58,7 @@ class Agent(object):
                 self.policy(robot, prevState, n) #Take action with best Q value after observing the initial state
                 curState = self.getState(robot)
                 curModelState = gazebo.getModelState()
-                self.Q[prevState] = self.Q[prevState] + alpha*( self.reward(prevState) + gamma*max(self.Q[curState]) - self.Q[prevState] )
+                self.Q[prevState] = self.Q[prevState] + alpha*( self.reward(prevState) + gamma*self.Q[curState] - self.Q[prevState] )
                 #Create exit conditions
                 if np.isclose(curModelState.position.x, prevModelState.position.x, atol=0.002) and np.isclose(curModelState.position.y, prevModelState.position.y, atol=0.002): #Tests if robot has been stuck for 3 steps
                     stuck += 1
@@ -121,26 +121,26 @@ class Agent(object):
             #print("Left40")
             robot.turnLeft(np.radians(40))
         elif maxInd == 2:
-            #print("Left20")
-            robot.turnLeft(np.radians(20))
-        elif maxInd == 3:
-            #print("Left10")
-            robot.turnLeft(np.radians(10))
-        elif maxInd == 4:
-            #print("Left0")
-            robot.turnLeft(np.radians(0.3))
-        elif maxInd == 5:
             #print("Right40")
             robot.turnRight(np.radians(40))
-        elif maxInd == 6:
-            #print("Right20")
-            robot.turnRight(np.radians(20))
-        elif maxInd == 7:
-            #print("Right10")
-            robot.turnRight(np.radians(10))
-        elif maxInd == 8:
-            #print("Right0")
-            robot.turnRight(np.radians(0.3))
+        #elif maxInd == 3:
+        #    #print("Left10")
+        #    robot.turnLeft(np.radians(10))
+        #elif maxInd == 4:
+        #    #print("Left0")
+        #    robot.turnLeft(np.radians(0.3))
+        #elif maxInd == 5:
+        #    #print("Right40")
+        #    robot.turnRight(np.radians(40))
+        #elif maxInd == 6:
+        #    #print("Right20")
+        #    robot.turnRight(np.radians(20))
+        #elif maxInd == 7:
+        #    #print("Right10")
+        #    robot.turnRight(np.radians(10))
+        #elif maxInd == 8:
+        #    #print("Right0")
+        #    robot.turnRight(np.radians(0.3))
     
 
     def getState(self, robot): 
@@ -246,10 +246,10 @@ class Triton(object):
         #m = len(msg.self.ranges)
         #dTheta = msg.angle_increment * 180/np.pi
         self.ranges = {
-                'right': np.mean(msg.ranges[:60]),
-                'front-right': np.mean(msg.ranges[30:60]),
-                'front': np.mean(msg.ranges[80:100]), #60:120 originally
-                'left': np.mean(msg.ranges[120:180]),
+                'right': min(msg.ranges[:60]),      #or use np.mean
+                'front-right': min(msg.ranges[30:60]),
+                'front': min(msg.ranges[80:100]), #60:120 originally
+                'left': min(msg.ranges[120:180]),
                 }
         #print('Right', self.ranges['right'], 'Left', ranges['left'], 'front', ranges['front'])
         
