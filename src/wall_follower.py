@@ -24,11 +24,11 @@ class Agent(object):
             for fr in [1,3]:
                 for f in range(a-1):        #Wall Following preinitialized Q table (only enough to follow a wall)
                     for l in [1,3]:                 #  F     L40   L20   L10   L0.3  R40  R20   R10   R0.3
-                        self.Q[(r,fr,f,l)] = np.array([-0.4, -0.5, -0.5])#np.array([0, 0, 0, 0, 0, 0, 0, 0, 0])   #Move forwards normally
+                        self.Q[(r,fr,f,l)] = np.array([-0.4, -0.5, -0.5]) #, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5])  #Move forwards normally
                         if (r >= 3):
-                            self.Q[(r,fr,f,l)][2] = -0.1
+                            self.Q[(r,fr,f,l)][2] = -0.1 #turn right if R is too far
                         elif (r <= 1):
-                            self.Q[(r,fr,f,l)][1] = -0.1
+                            self.Q[(r,fr,f,l)][1] = -0.1 #turn left if R is too close
    
 
     #episodes to train on, alpha is learning rate.
@@ -117,6 +117,9 @@ class Agent(object):
         elif maxInd == 2:
             #print("Right40")
             robot.turnRight(np.radians(40))
+        #elif maxInd == 2:
+        #    #print("Left20")
+        #    robot.turnLeft(np.radians(20))
         #elif maxInd == 3:
         #    #print("Left10")
         #    robot.turnLeft(np.radians(10))
@@ -199,7 +202,7 @@ class Gazebo(object):
     
     #Only set x,y positions (don't want to lift robot), and z orientation (don't want to tip robot)
     #Default values put robot in corner of maze.
-    def setModelState(self, x = 3.5, y = 3.1, z = math.pi/4 - 0.2):
+    def setModelState(self, x = 3.5, y = 3.1, z = math.pi - 0.2):
         rospy.wait_for_service('/gazebo/set_model_state')
         self.state_msg.pose.position.y = y
         self.state_msg.pose.position.x = x
@@ -240,29 +243,29 @@ class Triton(object):
         #m = len(msg.self.ranges)
         #dTheta = msg.angle_increment * 180/np.pi
         self.ranges = {
-                'right': min(msg.ranges[:60]),      #or use np.mean
-                'front-right': min(msg.ranges[30:60]),
-                'front': min(msg.ranges[80:100]), #60:120 originally
-                'left': min(msg.ranges[120:180]),
+                'right': min(msg.ranges[-90:-30]),      #or use np.mean
+                'front-right': min(msg.ranges[-60:-30]),
+                'front': min(np.concatenate( (msg.ranges[-10:], msg.ranges[:10]) )), #60:120 originally
+                'left': min(msg.ranges[30:90]),
                 }
         #print('Right', self.ranges['right'], 'Left', ranges['left'], 'front', ranges['front'])
         
     def moveForward(self, speed = 0.3):
         #define message. Using Pose to control velocity.
-        self.vel_msg.x = 0
-        self.vel_msg.y = speed
+        self.vel_msg.x = speed
+        self.vel_msg.y = 0
         self.vel_msg.theta = 0
         #rospy.loginfo("Forwards")
         self.vel_pub.publish(self.vel_msg)
     
     def turnLeft(self, angSpeed, speed = 0.3):
-        self.vel_msg.y = speed
+        self.vel_msg.x = speed
         self.vel_msg.theta = angSpeed
         #rospy.loginfo("Turning Left")
         self.vel_pub.publish(self.vel_msg)
     
     def turnRight(self, angSpeed, speed = 0.3):
-        self.vel_msg.y = speed
+        self.vel_msg.x = speed
         self.vel_msg.theta = -angSpeed
         #rospy.loginfo("Turning Right")
         self.vel_pub.publish(self.vel_msg)
