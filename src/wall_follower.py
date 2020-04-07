@@ -38,7 +38,7 @@ class Agent(object):
             robot.stop()
             randx = random.randrange(3,9) - 4.5
             randy = random.randrange(1,9) - 4.5
-            gazebo.setModelState(randx, randy) #puts robot randomly in any square except top 2 rows. Always faces same direction.
+            gazebo.setModelState() #puts robot randomly in any square except top 2 rows. Always faces same direction.
             #Initialize Variables
             rospy.loginfo("Episode" + str(n))
             goodPolicy = 0
