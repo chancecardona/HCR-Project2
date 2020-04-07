@@ -22,22 +22,13 @@ class Agent(object):
         #Pre initialize Q table so robot can follow walls.
         for r in range(a):
             for fr in [1,3]:
-                for f in range(a-1):
+                for f in range(a-1):        #Wall Following preinitialized Q table (only enough to follow a wall)
                     for l in [1,3]:                 #  F     L40   L20   L10   L0.3  R40  R20   R10   R0.3
-                        self.Q[(r,fr,f,l)] = np.array([0, 0, 0])#np.array([0, 0, 0, 0, 0, 0, 0, 0, 0])   #Move forwards normally
-                        if (l == 1):            
-                            self.Q[(r,fr,f,l)][1] = -1 #left is close turn lefts-1
-                        if (f == 1):
-                            self.Q[(r,fr,f,l)][0] = -1 #front is close forward-1
-                        if (f == 0):
-                            self.Q[(r,fr,f,l)][0] = -2 #front is too close forward-2
-                        if (r == 4):
-                            self.Q[(r,fr,f,l)][2] = -1 #right is too far rights-1
-                        if (r == 0):
-                            self.Q[(r,fr,f,l)][2] = -2 #right is too close rights-2, lefts+=1
-                            self.Q[(r,fr,f,l)][1] += 1
-                        if (fr == 1): 
-                            self.Q[(r,fr,f,l)][2] -= 1 #fr is close rights-=1
+                        self.Q[(r,fr,f,l)] = np.array([-0.4, -0.5, -0.5])#np.array([0, 0, 0, 0, 0, 0, 0, 0, 0])   #Move forwards normally
+                        if (r >= 3):
+                            self.Q[(r,fr,f,l)][2] = -0.1
+                        elif (r <= 1):
+                            self.Q[(r,fr,f,l)][1] = -0.1
    
 
     #episodes to train on, alpha is learning rate.
@@ -47,19 +38,20 @@ class Agent(object):
             robot.stop()
             randx = random.randrange(3,9) - 4.5
             randy = random.randrange(1,9) - 4.5
-            gazebo.setModelState() #puts robot randomly in any square except top 2 rows. Always faces same direction.
+            gazebo.setModelState(randx, randy) #puts robot randomly in any square except top 2 rows. Always faces same direction.
             #Initialize Variables
             rospy.loginfo("Episode" + str(n))
             goodPolicy = 0
             stuck = 0
             prevState = self.getState(robot)
             prevModelState = gazebo.getModelState()
-            for i in range(2000):
+            for i in range(4000):
                 self.policy(robot, prevState, n) #Take action with best Q value after observing the initial state
                 curState = self.getState(robot)
                 curModelState = gazebo.getModelState()
                 self.Q[prevState] = self.Q[prevState] + alpha*( self.reward(prevState) + gamma*self.Q[curState] - self.Q[prevState] )
-                #Create exit conditions
+                #Create exit conditions##############
+                #Stuck condition
                 if np.isclose(curModelState.position.x, prevModelState.position.x, atol=0.002) and np.isclose(curModelState.position.y, prevModelState.position.y, atol=0.002): #Tests if robot has been stuck for 3 steps
                     stuck += 1
                     if stuck == 3:
@@ -67,6 +59,7 @@ class Agent(object):
                         break
                 else:
                     stuck = 0
+                #Good Policy condition
                 if curState[0] == 2 and curState[2] != 0: #Tests if robot has found a good policy (right is med, front isnt too close)
                     goodPolicy += 1
                     if goodPolicy == 1000:
@@ -74,6 +67,7 @@ class Agent(object):
                         break
                 else:
                     goodPolicy = 0
+                #Tipped condition
                 (r, p, y) = tf.transformations.euler_from_quaternion([curModelState.orientation.x, curModelState.orientation.y, curModelState.orientation.z, curModelState.orientation.w])
                 if abs(r) > math.pi/8 or abs(p) > math.pi/8:
                     rospy.loginfo("Robot Tipped. Ending episode.")
