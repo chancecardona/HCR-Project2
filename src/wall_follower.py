@@ -171,6 +171,15 @@ class Agent(object):
             L = 1
         elif robot.ranges['left'] > 0.5:
             L = 3
+        #Defining Orientation
+        LS = np.linalg.lstsq(self.A, robot.ranges['orientation'], rcond=None) #Least Squares
+        m, c = LS[0]
+        r2 = LS[1] #residual values. 
+        rospy.loginfo(str(m) + ',' + str(r2)) #Printing. For testing purposes only.
+        plt.plot(self.A[:,0], robot.ranges['orientation'], 'o')
+        plt.plot(self.A[:,0], m*self.A[:,0] + c)
+        plt.show()
+
         
         return (R, FR, F, L)
 
@@ -247,6 +256,7 @@ class Triton(object):
                 'front-right': min(msg.ranges[-60:-30]),
                 'front': min(np.concatenate( (msg.ranges[-10:], msg.ranges[:10]) )), #60:120 originally
                 'left': min(msg.ranges[30:90]),
+                'orientation': msg.ranges[-120:-60],
                 }
         #print('Right', self.ranges['right'], 'Left', ranges['left'], 'front', ranges['front'])
         
