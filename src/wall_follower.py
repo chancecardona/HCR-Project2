@@ -10,7 +10,7 @@ from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Pose, Pose2D, Twist
 from gazebo_msgs.msg import ModelState
 from gazebo_msgs.srv import SetModelState, GetModelState
-
+import matplotlib.pyplot as plt
 
 class Agent(object):
     """Q Learning Agent."""
@@ -18,17 +18,20 @@ class Agent(object):
     def __init__(self):
         self.Q = {}      #Q is a dict with states (R, FR, F, L) being the key, and possible Action's rewards being the value.
         self.states = {'tooClose':0, 'close':1, 'medium':2, 'far':3, 'tooFar':4}
+        self.x = np.linspace(-30,30,60)
+        self.A = np.vstack([(self.x, np.ones(60))]).T
         a = len(self.states)
         #Pre initialize Q table so robot can follow walls.
         for r in range(a):
             for fr in [1,3]:
                 for f in range(a-1):        #Wall Following preinitialized Q table (only enough to follow a wall)
-                    for l in [1,3]:                 #  F     L40   L20   L10   L0.3  R40  R20   R10   R0.3
-                        self.Q[(r,fr,f,l)] = np.array([-0.4, -0.5, -0.5]) #, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5])  #Move forwards normally
-                        if (r >= 3):
-                            self.Q[(r,fr,f,l)][2] = -0.1 #turn right if R is too far
-                        elif (r <= 1):
-                            self.Q[(r,fr,f,l)][1] = -0.1 #turn left if R is too close
+                    for l in [1,3]:                 
+                        for o in [-1,0,1,np.nan]:
+                            self.Q[(r,fr,f,l,o)] = np.array([-0.4, -0.5, -0.5]) #, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5])  #Move forwards
+                            if (r >= 3):           
+                                self.Q[(r,fr,f,l,o)][2] = -0.1 #turn right if R is too far
+                            elif (r <= 1):
+                                self.Q[(r,fr,f,l,o)][1] = -0.1 #turn left if R is too close
    
 
     #episodes to train on, alpha is learning rate.
@@ -172,16 +175,28 @@ class Agent(object):
         elif robot.ranges['left'] > 0.5:
             L = 3
         #Defining Orientation
-        LS = np.linalg.lstsq(self.A, robot.ranges['orientation'], rcond=None) #Least Squares
+        self.sweep = robot.ranges['orientation']*np.cos(np.radians(self.x)) #Lidar values transformed into cartesian
+        LS = np.linalg.lstsq(self.A, self.sweep, rcond=None) #Least Squares
         m, c = LS[0]
-        r2 = LS[1] #residual values. 
-        rospy.loginfo(str(m) + ',' + str(r2)) #Printing. For testing purposes only.
-        plt.plot(self.A[:,0], robot.ranges['orientation'], 'o')
-        plt.plot(self.A[:,0], m*self.A[:,0] + c)
-        plt.show()
+        r2 = 1 - LS[1][0] / (60 * np.var(self.sweep)) #residual values. 
+        #rospy.loginfo(str(m) + ',' + str(r2)) #Printing. For testing purposes only.
+        #rospy.loginfo(str(robot.ranges['orientation']))
+        #plt.plot(self.x, self.sweep, 'o')
+        #plt.plot(self.x, m*self.x + c)
+        #plt.title(str(m) + ',' + str(r2))
+        #plt.show()
+        if r2 > 0.2:
+            if m > 0.003:
+                O = -1 #approaching
+            elif m < -0.003:
+                O = 1 #moving away
+            else:
+                O = 0 #parallel
+        else:
+            O = np.nan
 
         
-        return (R, FR, F, L)
+        return (R, FR, F, L, O)
 
     def saveQ(self):
         np.save('ccardona_Q_table.npy', self.Q)
@@ -322,10 +337,9 @@ if __name__ == '__main__':
         #Solve Maze
         while True:
             state = Q_Agent.getState(triton)
-            #print(state)
+            print(state)
             Q_Agent.policy(triton, state, 0, 0) #runs q table according to epsilon greedy.
             triton.loop_rate.sleep()
-        
 
 
     except rospy.ROSInterruptException:
