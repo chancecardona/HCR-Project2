@@ -2,19 +2,14 @@ Code by Chance Cardona
 Uses python3
 To launch in train mode:
 	roslaunch wall_follower train.launch
-To launch in test mode (NOTE! Requires valid ccardona_Q_table.npy in your ~/.ros/ directory):
+To launch in test mode (NOTE! If no ccardona_Q_table.npy file in node's directory it will run pre initialized Q table):
 	roslaunch wall_follower test.launch
 
-Make sure that you copy and pase the ccardona_Q_table.npy from this directory into your ~/.ros/ directory
-before you run the test.launch file! Else you'll run into an error. This is the result of my best trained
-set, but ultimately the robot just went in a circle.
+This is the best trained result, from about 4 hours of training 150 episodes. You shouldn't have to 
+worry about moving any files around, this one should all work out of the box.
 
-I tried my best to get this code working, but ultimately I couldn't get the robot to train correctly.
-In my code I have fullfilled all the other requirements as far as I know. This code correctly updates
-the Q table, uses a decayed epsilon for its policy, randomizes robot position each time, and can load
-and save the Q table. I fully beleive that if this problem is possible a few tweaks in the right
-direction would make it work, however I'm just out of time. This project was really hard. I played with
-different lidar scan ranges, different speeds, I created more turning actions possible, and a ton of 
-different reward functions. I even tried to get it to work with LinearRegression to estimate the walls
-orientation, however due to the way the lidar is not continuous I was not able to get this working.
-I thus have no video link.
+This version now actually works to solve all corners. Improvements were changing my acion space to be smaller,
+adding a linear regression to calculate an Orientation state, and tweaking my LIDAR sweep domains. In addition
+I updated the launch files so the code works out of the box now, with ccardona_Q_table.npy being included in 
+the wall_follower/src/ directory, which is where the code looks for it now. Thank you for allowing corrections!
+video at: https://youtube.com/video/QO0UvDqAUf8/

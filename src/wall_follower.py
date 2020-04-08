@@ -10,6 +10,7 @@ from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Pose, Pose2D, Twist
 from gazebo_msgs.msg import ModelState
 from gazebo_msgs.srv import SetModelState, GetModelState
+from std_srvs.srv import Empty
 import matplotlib.pyplot as plt
 
 class Agent(object):
@@ -26,7 +27,7 @@ class Agent(object):
             for fr in [1,3]:
                 for f in range(a-1):        #Wall Following preinitialized Q table (only enough to follow a wall)
                     for l in [1,3]:                 
-                        for o in [-1,0,1,np.nan]:
+                        for o in [0,1,2,-1]:
                             self.Q[(r,fr,f,l,o)] = np.array([-0.4, -0.5, -0.5]) #, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5])  #Move forwards
                             if (r >= 3):           
                                 self.Q[(r,fr,f,l,o)][2] = -0.1 #turn right if R is too far
@@ -41,7 +42,7 @@ class Agent(object):
             robot.stop()
             randx = random.randrange(3,9) - 4.5
             randy = random.randrange(1,9) - 4.5
-            gazebo.setModelState() #puts robot randomly in any square except top 2 rows. Always faces same direction.
+            gazebo.setModelState(randx, randy) #puts robot randomly in any square except top 2 rows. Always faces same direction.
             #Initialize Variables
             rospy.loginfo("Episode" + str(n))
             goodPolicy = 0
@@ -185,15 +186,15 @@ class Agent(object):
         #plt.plot(self.x, m*self.x + c)
         #plt.title(str(m) + ',' + str(r2))
         #plt.show()
-        if r2 > 0.2:
+        if r2 > 0.5:
             if m > 0.003:
-                O = -1 #approaching
+                O = 0 #approaching
             elif m < -0.003:
-                O = 1 #moving away
+                O = 2 #moving away
             else:
-                O = 0 #parallel
+                O = 1 #parallel
         else:
-            O = np.nan
+            O = -1
 
         
         return (R, FR, F, L, O)
@@ -216,7 +217,9 @@ class Gazebo(object):
 
     def getModelState(self):
         try:
+            #rospy.ServiceProxy('/gazebo/pause_physics', Empty)
             rospy.wait_for_service('/gazebo/get_model_state')
+            #rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
         except rospy.ServiceException as e:
             rospy.loginfo("GAZEBO NOT UPDATED")
             pass
@@ -234,7 +237,7 @@ class Gazebo(object):
         set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState) 
         resp = set_state(self.state_msg)
 
-        
+     
 
 
 class Triton(object):
@@ -269,7 +272,7 @@ class Triton(object):
         self.ranges = {
                 'right': min(msg.ranges[-90:-30]),      #or use np.mean
                 'front-right': min(msg.ranges[-60:-30]),
-                'front': min(np.concatenate( (msg.ranges[-10:], msg.ranges[:10]) )), #60:120 originally
+                'front': min(np.concatenate( (msg.ranges[-15:], msg.ranges[:15]) )), #-30:30 originally
                 'left': min(msg.ranges[30:90]),
                 'orientation': msg.ranges[-120:-60],
                 }
@@ -330,11 +333,13 @@ if __name__ == '__main__':
             rospy.loginfo("Starting in Test mode. Loading pretrained Q table.")
             try:
                 Q_Agent.loadQ()
+                print("Loaded Q table.")
             except:
                 rospy.loginfo("No trained Q table. Starting from preinitialized Q table.")
 
 
         #Solve Maze
+        G.setModelState()
         while True:
             state = Q_Agent.getState(triton)
             print(state)
